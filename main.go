@@ -15,7 +15,7 @@ func main() {
 	if len(flag.Args()) < 1 {
 		log.Fatal("must provide a url")
 	}
-	url, err := url.Parse(flag.Arg(1))
+	url, err := url.Parse(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err)
 	}
