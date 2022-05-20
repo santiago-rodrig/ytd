@@ -2,53 +2,100 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
+	"path"
+	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
-var playlist = flag.Bool("playlist", false, "should the whole playlist be downloaded?")
+var config map[string]map[string]string
 
 func main() {
 	flag.Parse()
-	if len(flag.Args()) < 1 {
-		log.Fatal("must provide a url")
-	}
-	url, err := url.Parse(flag.Arg(0))
+	err := verifyCommands()
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = exec.LookPath("youtube-dl")
+	err = readConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	var cmdArgs []string
-	if *playlist {
-		cmdArgs = []string{
-			"-x",
-			"--audio-format",
-			"mp3",
-			"-o",
-			"%(title)s.%(ext)s",
-			url.String(),
+	for dir, urls := range config {
+		dirEntries, err := os.ReadDir(dir)
+		if err != nil {
+			log.Fatal(err)
 		}
-	} else {
-		cmdArgs = []string{
-			"-x",
-			"--audio-format",
-			"mp3",
-			"--no-playlist",
-			"-o",
-			"%(title)s.%(ext)s",
-			url.String(),
+		err = os.Chdir(dir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for url, fileName := range urls {
+			for _, entry := range dirEntries {
+				if !entry.IsDir() {
+					if entry.Name() == fileName {
+						continue
+					}
+					err = downloadSong(url)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			}
 		}
 	}
-	downloadCmd := exec.Command("youtube-dl", cmdArgs...)
+}
+
+func readConfig() error {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadFile(path.Join(homedir, ".config", "ytd", "ytd.toml"))
+	if err != nil {
+		return err
+	}
+	err = toml.Unmarshal(data, config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyCommands() error {
+	_, err := exec.LookPath("youtube-dl")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func readURLs(filename string) ([]string, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(data), "\n"), nil
+}
+
+func downloadSong(url string) error {
+	downloadCmd := exec.Command("youtube-dl",
+		"-x",
+		"--audio-format",
+		"mp3",
+		"--no-playlist",
+		"-o",
+		"%(title)s.%(ext)s",
+		url,
+	)
 	downloadCmd.Stdout = os.Stdout
 	downloadCmd.Stderr = os.Stderr
-	err = downloadCmd.Run()
+	err := downloadCmd.Run()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
