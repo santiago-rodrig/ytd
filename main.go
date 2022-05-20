@@ -1,13 +1,17 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/url"
 	"os"
 	"os/exec"
 )
 
+var playlist = flag.Bool("playlist", false, "should the whole playlist be downloaded?")
+
 func main() {
+	flag.Parse()
 	if len(os.Args[1:]) < 1 {
 		log.Fatal("must provide a url")
 	}
@@ -19,7 +23,28 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	downloadCmd := exec.Command("youtube-dl", "-x", "--audio-format", "mp3", "--no-playlist", "-o", "%(title)s.%(ext)s", url.String())
+	var cmdArgs []string
+	if *playlist {
+		cmdArgs = []string{
+			"-x",
+			"--audio-format",
+			"mp3",
+			"-o",
+			"%(title)s.%(ext)s",
+			url.String(),
+		}
+	} else {
+		cmdArgs = []string{
+			"-x",
+			"--audio-format",
+			"mp3",
+			"--no-playlist",
+			"-o",
+			"%(title)s.%(ext)s",
+			url.String(),
+		}
+	}
+	downloadCmd := exec.Command("youtube-dl", cmdArgs...)
 	downloadCmd.Stdout = os.Stdout
 	err = downloadCmd.Run()
 	if err != nil {
