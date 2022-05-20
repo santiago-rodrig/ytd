@@ -46,6 +46,7 @@ func main() {
 	}
 	downloadCmd := exec.Command("youtube-dl", cmdArgs...)
 	downloadCmd.Stdout = os.Stdout
+	downloadCmd.Stderr = os.Stderr
 	err = downloadCmd.Run()
 	if err != nil {
 		log.Fatal(err)
