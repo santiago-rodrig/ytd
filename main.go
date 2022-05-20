@@ -12,10 +12,10 @@ var playlist = flag.Bool("playlist", false, "should the whole playlist be downlo
 
 func main() {
 	flag.Parse()
-	if len(os.Args[1:]) < 1 {
+	if len(flag.Args()) < 1 {
 		log.Fatal("must provide a url")
 	}
-	url, err := url.Parse(os.Args[1])
+	url, err := url.Parse(flag.Arg(1))
 	if err != nil {
 		log.Fatal(err)
 	}
