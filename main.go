@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -26,6 +25,11 @@ func main() {
 	}
 	for dir, urls := range config {
 		dirEntries, err := os.ReadDir(dir)
+		dirEntriesMap := make(map[string]struct{})
+		for _, entry := range dirEntries {
+			dirEntriesMap[entry.Name()] = struct{}{}
+		}
+
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -34,19 +38,56 @@ func main() {
 			log.Fatal(err)
 		}
 		for url, fileName := range urls {
+			isPresent := false
 			for _, entry := range dirEntries {
 				if !entry.IsDir() {
 					if entry.Name() == fileName {
-						continue
+						isPresent = true
+						break
 					}
-					err = downloadSong(url)
-					if err != nil {
-						log.Fatal(err)
+				}
+			}
+			if !isPresent {
+				err = downloadSong(url)
+				if err != nil {
+					log.Fatal(err)
+				}
+				dirEntries, err := os.ReadDir(dir)
+				if err != nil {
+					log.Fatal(err)
+				}
+				for _, entry := range dirEntries {
+					_, ok := dirEntriesMap[entry.Name()]
+					if !ok {
+						config[dir][url] = entry.Name()
+						break
 					}
 				}
 			}
 		}
 	}
+	err = writeConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func writeConfig() error {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path.Join(homedir, ".config", "ytd", "ytd.toml"), os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	encoder := toml.NewEncoder(f)
+	err = encoder.Encode(config)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func readConfig() error {
@@ -58,7 +99,7 @@ func readConfig() error {
 	if err != nil {
 		return err
 	}
-	err = toml.Unmarshal(data, config)
+	err = toml.Unmarshal(data, &config)
 	if err != nil {
 		return err
 	}
@@ -71,14 +112,6 @@ func verifyCommands() error {
 		return err
 	}
 	return nil
-}
-
-func readURLs(filename string) ([]string, error) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return strings.Split(string(data), "\n"), nil
 }
 
 func downloadSong(url string) error {
